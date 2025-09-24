@@ -1,0 +1,58 @@
+name: Build WeChatMsg EXE on Windows
+
+on:
+  push:
+    branches: [ master, main ]
+  workflow_dispatch:
+
+jobs:
+  build_windows:
+    runs-on: windows-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v3
+
+      - name: 设置 Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'  # Python3.10 或更高版本
+
+      - name: 安装依赖
+        run: |
+          # 如果有 requirements_pc.txt，安装其中依赖
+          if (Test-Path requirements_pc.txt) {
+            python -m pip install --upgrade pip
+            python -m pip install -r requirements_pc.txt
+          }
+          # 如果有 requirements.txt，安装其中依赖
+          if (Test-Path requirements.txt) {
+            python -m pip install --upgrade pip
+            python -m pip install -r requirements.txt
+          }
+          # 如果有其他 requirements 文件，可继续检测
+
+      - name: 使用 PyInstaller 打包
+        run: |
+          # 使用 PyInstaller 将 main_pc.py 打包为单个 exe
+          pip install pyinstaller
+          pyinstaller --noconfirm --clean --onefile --windowed ^
+            --add-data "exporter;exporter" ^
+            --add-data "wxManager;wxManager" ^
+            --add-data "app/data/avatar;app/data/avatar" ^
+            --add-data "app/data/image2;app/data/image2" ^
+            --icon "logo.ico" ^
+            main_pc.py
+        shell: cmd
+
+      - name: 压缩并上传可执行文件
+        run: |
+          # 将生成的 exe 压缩为 zip
+          $exePath = Join-Path -Path dist -ChildPath "main_pc.exe"
+          Compress-Archive -Path $exePath -DestinationPath WeChatMsg.zip
+        shell: powershell
+
+      - name: 上传 Zip 包为 Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: WeChatMsg_windows
+          path: WeChatMsg.zip
